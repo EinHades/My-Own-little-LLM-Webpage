@@ -2,7 +2,7 @@ from airllm import AutoModel
 
 MAX_LENGTH = 128
 # could use hugging face model repo id:
-model = AutoModel.from_pretrained("garage-bAInd/Platypus2-70B-instruct")
+model = AutoModel.from_pretrained("google/gemma-3-4b-it")
 
 # or use model's local path...
 #model = AutoModel.from_pretrained("/home/ubuntu/.cache/huggingface/hub/models--garage-bAInd--Platypus2-70B-instruct/snapshots/b585e74bcaae02e52665d9ac6d23f4d0dbc81a0f")
