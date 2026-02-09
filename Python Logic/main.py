@@ -1,8 +1,5 @@
-import subprocess
 from ollama import chat
 from ollama import ChatResponse
-
-subprocess.run(["ollama", "serve"], check=True)
 
 response: ChatResponse = chat(model='gemma3', messages=[
   {
