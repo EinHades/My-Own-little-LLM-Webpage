@@ -79,9 +79,13 @@
             background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%;
             background-size: 6px 6px, 6px 6px;
             background-repeat: no-repeat;
+            min-width: 220px;
+            line-height: 1.2;
         }
         .pill-select option {
             color: #151517;
+            background: #f2f3f5;
+            padding: 6px 10px;
         }
         .pill-input::placeholder {
             color: #8b8b91;
@@ -98,6 +102,17 @@
             color: #bfc2c9;
             font-size: 13px;
             min-height: 18px;
+        }
+        .response-panel {
+            margin-top: 18px;
+            background: #1e1e20;
+            border: 1px solid #3a3a3d;
+            border-radius: 18px;
+            padding: 14px 16px;
+            color: #f9fafb;
+            font-size: 15px;
+            min-height: 64px;
+            white-space: pre-wrap;
         }
         .icon-group {
             display: flex;
@@ -161,6 +176,7 @@
                     </button>
                 </div>
             </div>
+            <div class="response-panel" id="response-panel">Response will appear here.</div>
         </div>
     </div>
     <script>
@@ -168,11 +184,15 @@
         const sendButton = document.getElementById("send-button");
         const modelInput = document.getElementById("model-input");
         const modelStatus = document.getElementById("model-status");
+        const responsePanel = document.getElementById("response-panel");
         let statusTimer = null;
+        let modelReady = false;
 
         const updateSendState = () => {
             const hasText = input.value.trim().length > 0;
-            sendButton.classList.toggle("active", hasText);
+            const canSend = hasText && modelReady;
+            sendButton.disabled = !canSend;
+            sendButton.classList.toggle("active", canSend);
         };
 
         const updateStatus = async () => {
@@ -184,16 +204,22 @@
                 }
 
                 modelStatus.textContent = payload.message || "";
+                if (payload.state === "ready") {
+                    modelReady = payload.model === modelInput.value.trim();
+                }
                 if (["ready", "error", "idle"].includes(payload.state)) {
                     clearInterval(statusTimer);
                     statusTimer = null;
                     modelInput.disabled = false;
+                    updateSendState();
                 }
             } catch (error) {
                 modelStatus.textContent = error.message || "Failed to read status.";
                 clearInterval(statusTimer);
                 statusTimer = null;
                 modelInput.disabled = false;
+                modelReady = false;
+                updateSendState();
             }
         };
 
@@ -205,6 +231,8 @@
             }
             modelInput.disabled = true;
             modelStatus.textContent = "Starting...";
+            modelReady = false;
+            updateSendState();
 
             try {
                 const response = await fetch("/set-model", {
@@ -224,6 +252,38 @@
                 }
             } catch (error) {
                 modelStatus.textContent = error.message || "Failed to set model.";
+            }
+        };
+
+        const sendPrompt = async () => {
+            const prompt = input.value.trim();
+            const model = modelInput.value.trim();
+            if (!prompt || !modelReady) {
+                return;
+            }
+
+            sendButton.disabled = true;
+            responsePanel.textContent = "Sending...";
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ prompt, model }),
+                });
+
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || "Failed to send prompt.");
+                }
+
+                responsePanel.textContent = payload.response || "";
+                input.value = "";
+            } catch (error) {
+                responsePanel.textContent = error.message || "Failed to send prompt.";
+            } finally {
+                updateSendState();
             }
         };
 
@@ -257,6 +317,12 @@
 
         input.addEventListener("input", updateSendState);
         modelInput.addEventListener("change", setModel);
+        sendButton.addEventListener("click", sendPrompt);
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                sendPrompt();
+            }
+        });
         updateSendState();
         loadModels();
     </script>
