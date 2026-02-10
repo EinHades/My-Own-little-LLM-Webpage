@@ -8,6 +8,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --transition-speed: 0.6s;
+            --transition-ease: ease-in-out;
+            --composer-shift: 0px;
+        }
         body {
             background-color: #151517;
             margin: 0;
@@ -16,6 +21,7 @@
             justify-content: center;
             align-items: center;
             font-family: "Rubik", "Segoe UI", sans-serif;
+            transition: background-color var(--transition-speed) var(--transition-ease);
         }
         .hero {
             display: flex;
@@ -28,6 +34,7 @@
             color: #f9fafb;
             margin: 0;
             font-size: calc(2rem + 25px);
+            transition: opacity var(--transition-speed) var(--transition-ease);
         }
         .composer {
             width: 100%;
@@ -35,6 +42,8 @@
             border-radius: 28px;
             padding: 18px 20px;
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+            transition: transform var(--transition-speed) var(--transition-ease),
+                box-shadow var(--transition-speed) var(--transition-ease);
         }
         .composer-input {
             width: 100%;
@@ -113,6 +122,10 @@
             font-size: 15px;
             min-height: 64px;
             white-space: pre-wrap;
+            transition: opacity var(--transition-speed) var(--transition-ease),
+                max-height var(--transition-speed) var(--transition-ease),
+                padding var(--transition-speed) var(--transition-ease),
+                margin var(--transition-speed) var(--transition-ease);
         }
         .icon-group {
             display: flex;
@@ -150,6 +163,59 @@
             opacity: 0.7;
             cursor: not-allowed;
         }
+        .chat-area {
+            position: fixed;
+            left: 50%;
+            top: 110px;
+            transform: translateX(-50%);
+            width: min(900px, 92vw);
+            max-height: calc(100vh - 240px);
+            overflow-y: auto;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition-speed) var(--transition-ease);
+        }
+        .chat-bubble {
+            max-width: 78%;
+            padding: 14px 16px;
+            border-radius: 18px;
+            margin: 0 0 14px;
+            line-height: 1.5;
+            font-size: 15px;
+        }
+        .chat-bubble.user {
+            margin-left: auto;
+            background: #2a2f3d;
+            border: 1px solid #333948;
+            color: #f2f4f8;
+        }
+        .chat-bubble.ai {
+            margin-right: auto;
+            background: #1f2733;
+            border: 1px solid #2d3c4b;
+            color: #f2f4f8;
+        }
+        .chat-mode-active h1 {
+            opacity: 0;
+        }
+        .chat-mode-ready h1 {
+            display: none;
+        }
+        .chat-mode-active .composer {
+            transform: translateY(var(--composer-shift));
+            box-shadow: 0 18px 36px rgba(0, 0, 0, 0.4);
+        }
+        .chat-mode-active .response-panel {
+            opacity: 0;
+            max-height: 0;
+            padding: 0;
+            margin-top: 0;
+            border-width: 0;
+        }
+        .chat-mode-active .chat-area {
+            opacity: 1;
+            pointer-events: auto;
+        }
     </style>
 </head>
 <body>
@@ -176,17 +242,43 @@
                     </button>
                 </div>
             </div>
-            <div class="response-panel" id="response-panel">Response will appear here.</div>
         </div>
     </div>
+    <div class="chat-area" id="chat-area" aria-live="polite" aria-hidden="true"></div>
     <script>
         const input = document.getElementById("composer-input");
         const sendButton = document.getElementById("send-button");
         const modelInput = document.getElementById("model-input");
         const modelStatus = document.getElementById("model-status");
-        const responsePanel = document.getElementById("response-panel");
+        const chatArea = document.getElementById("chat-area");
         let statusTimer = null;
         let modelReady = false;
+        let chatModeActive = false;
+        const transitionDuration = 600;
+
+        const enterChatMode = () => {
+            if (chatModeActive) {
+                return;
+            }
+            chatModeActive = true;
+            const composer = document.querySelector(".composer");
+            const rect = composer.getBoundingClientRect();
+            const shift = window.innerHeight - rect.bottom - 24;
+            document.documentElement.style.setProperty("--composer-shift", `${shift}px`);
+            document.body.classList.add("chat-mode-active");
+            setTimeout(() => {
+                document.body.classList.add("chat-mode-ready");
+            }, transitionDuration);
+        };
+
+        const appendBubble = (role, text) => {
+            const bubble = document.createElement("div");
+            bubble.className = `chat-bubble ${role}`;
+            bubble.textContent = text;
+            chatArea.appendChild(bubble);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return bubble;
+        };
 
         const updateSendState = () => {
             const hasText = input.value.trim().length > 0;
@@ -262,8 +354,10 @@
                 return;
             }
 
+            enterChatMode();
             sendButton.disabled = true;
-            responsePanel.textContent = "Sending...";
+            appendBubble("user", prompt);
+            const aiBubble = appendBubble("ai", "Thinking...");
             try {
                 const response = await fetch("/chat", {
                     method: "POST",
@@ -278,10 +372,14 @@
                     throw new Error(payload.error || "Failed to send prompt.");
                 }
 
-                responsePanel.textContent = payload.response || "";
+                setTimeout(() => {
+                    aiBubble.textContent = payload.response || "";
+                }, 400);
                 input.value = "";
             } catch (error) {
-                responsePanel.textContent = error.message || "Failed to send prompt.";
+                setTimeout(() => {
+                    aiBubble.textContent = error.message || "Failed to send prompt.";
+                }, 300);
             } finally {
                 updateSendState();
             }
@@ -320,6 +418,7 @@
         sendButton.addEventListener("click", sendPrompt);
         input.addEventListener("keydown", (event) => {
             if (event.key === "Enter") {
+                event.preventDefault();
                 sendPrompt();
             }
         });
