@@ -84,6 +84,11 @@
             background: #3c5081;
             border-color: #3c5081;
         }
+        .icon-button.icon-image.active {
+            background: #5686fe;
+            border-color: #5686fe;
+            opacity: 1;
+        }
         .icon-button.icon-image img {
             width: 20px;
             height: 20px;
@@ -100,19 +105,31 @@
     <div class="hero">
         <h1>LLM, your way!</h1>
         <div class="composer">
-            <input class="composer-input" type="text" placeholder="Ask AI, on your Hardware!" />
+            <input class="composer-input" id="composer-input" type="text" placeholder="Ask AI, on your Hardware!" />
             <div class="composer-actions">
                 <div class="pill-group">
                     <button class="pill-button" type="button" disabled>Chose Model</button>
                 </div>
                 <div class="icon-group">
                     <button class="icon-button" type="button" disabled>📎</button>
-                    <button class="icon-button icon-image" type="button" disabled>
-                        <img src="https://github.com/EinHades/My-Own-little-LLM-Webpage/blob/dc447ab535f2e35aaae4819a360a79b3809fc009/Images/Button.png" width="20" height="20" alt="Send" />
+                    <button class="icon-button icon-image" id="send-button" type="button" disabled>
+                        <img src="https://raw.githubusercontent.com/EinHades/My-Own-little-LLM-Webpage/main/HTML%20Front-End/Images/Button.png" width="20" height="20" alt="Send" />
                     </button>
                 </div>
             </div>
         </div>
     </div>
+    <script>
+        const input = document.getElementById("composer-input");
+        const sendButton = document.getElementById("send-button");
+
+        const updateSendState = () => {
+            const hasText = input.value.trim().length > 0;
+            sendButton.classList.toggle("active", hasText);
+        };
+
+        input.addEventListener("input", updateSendState);
+        updateSendState();
+    </script>
 </body>
 </html>
