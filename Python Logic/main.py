@@ -1,6 +1,6 @@
 from pathlib import Path
 import subprocess
-from threading import Lock, Thread
+from threading import Lock
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 from ollama import ChatResponse, chat
@@ -73,17 +73,9 @@ def set_model():
   if not model:
     return jsonify({"ok": False, "error": "Model is required."}), 400
 
-  def worker() -> None:
-    try:
-      ensure_model_pulled(model)
-      global current_model
-      current_model = model
-      update_status("ready", "Model ready.", model)
-    except Exception as exc:
-      update_status("error", str(exc) or "Failed to set model.", model)
-
-  update_status("starting", "Starting...", model)
-  Thread(target=worker, daemon=True).start()
+  global current_model
+  current_model = model
+  update_status("selected", "Model selected.", model)
   return jsonify({"ok": True, "model": model})
 
 
@@ -104,6 +96,7 @@ def get_model_status():
 
 @app.post("/chat")
 def chat_prompt():
+  global current_model
   data = request.get_json(silent=True) or {}
   prompt = str(data.get("prompt", "")).strip()
   model = str(data.get("model", "")).strip() or current_model
@@ -112,6 +105,14 @@ def chat_prompt():
     return jsonify({"ok": False, "error": "Prompt is required."}), 400
   if not model:
     return jsonify({"ok": False, "error": "Model is required."}), 400
+
+  try:
+    ensure_model_pulled(model)
+    current_model = model
+    update_status("ready", "Model ready.", model)
+  except Exception as exc:
+    update_status("error", str(exc) or "Failed to pull model.", model)
+    return jsonify({"ok": False, "error": str(exc) or "Failed to pull model."}), 500
 
   response: ChatResponse = chat(
     model=model,

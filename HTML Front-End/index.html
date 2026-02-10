@@ -251,7 +251,6 @@
         const modelInput = document.getElementById("model-input");
         const modelStatus = document.getElementById("model-status");
         const chatArea = document.getElementById("chat-area");
-        let statusTimer = null;
         let modelReady = false;
         let chatModeActive = false;
         const transitionDuration = 600;
@@ -287,64 +286,13 @@
             sendButton.classList.toggle("active", canSend);
         };
 
-        const updateStatus = async () => {
-            try {
-                const response = await fetch("/model-status");
-                const payload = await response.json().catch(() => ({}));
-                if (!response.ok || !payload.ok) {
-                    throw new Error(payload.error || "Failed to read status.");
-                }
-
-                modelStatus.textContent = payload.message || "";
-                if (payload.state === "ready") {
-                    modelReady = payload.model === modelInput.value.trim();
-                }
-                if (["ready", "error", "idle"].includes(payload.state)) {
-                    clearInterval(statusTimer);
-                    statusTimer = null;
-                    modelInput.disabled = false;
-                    updateSendState();
-                }
-            } catch (error) {
-                modelStatus.textContent = error.message || "Failed to read status.";
-                clearInterval(statusTimer);
-                statusTimer = null;
-                modelInput.disabled = false;
-                modelReady = false;
-                updateSendState();
-            }
-        };
-
-        const setModel = async () => {
+        const setModel = () => {
             const model = modelInput.value.trim();
-            if (!model) {
-                modelStatus.textContent = "";
-                return;
-            }
-            modelInput.disabled = true;
-            modelStatus.textContent = "Starting...";
-            modelReady = false;
+            modelReady = Boolean(model);
+            modelStatus.textContent = model
+                ? "Model selected. Will pull on send if needed."
+                : "";
             updateSendState();
-
-            try {
-                const response = await fetch("/set-model", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ model }),
-                });
-
-                const payload = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(payload.error || "Failed to set model.");
-                }
-                if (!statusTimer) {
-                    statusTimer = setInterval(updateStatus, 1000);
-                }
-            } catch (error) {
-                modelStatus.textContent = error.message || "Failed to set model.";
-            }
         };
 
         const sendPrompt = async () => {
