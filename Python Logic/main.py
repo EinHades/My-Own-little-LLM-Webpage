@@ -3,8 +3,9 @@ from ollama import ChatResponse
 
 print("Ask a question to the model:")
 user_input = input()
+user_model_input = input("Enter the model name:")
 
-response: ChatResponse = chat(model='gemma3:270m', messages=[
+response: ChatResponse = chat(model= user_model_input, messages=[
   {
     'role': 'user',
     'content': user_input,
