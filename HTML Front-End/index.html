@@ -59,6 +59,32 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
+        }
+        .pill-input,
+        .pill-select {
+            background: #1e1e20;
+            color: #f9fafb;
+            border: 1px solid #3a3a3d;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 14px;
+            outline: none;
+        }
+        .pill-select {
+            appearance: none;
+            padding-right: 30px;
+            background-image: linear-gradient(45deg, transparent 50%, #8b8b91 50%),
+                linear-gradient(135deg, #8b8b91 50%, transparent 50%);
+            background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+        }
+        .pill-select option {
+            color: #151517;
+        }
+        .pill-input::placeholder {
+            color: #8b8b91;
         }
         .pill-button {
             background: #1e1e20;
@@ -67,6 +93,11 @@
             border-radius: 999px;
             padding: 8px 14px;
             font-size: 14px;
+        }
+        .pill-status {
+            color: #bfc2c9;
+            font-size: 13px;
+            min-height: 18px;
         }
         .icon-group {
             display: flex;
@@ -113,7 +144,15 @@
             <input class="composer-input" id="composer-input" type="text" placeholder="Ask AI, on your Hardware!" />
             <div class="composer-actions">
                 <div class="pill-group">
-                    <button class="pill-button" type="button" disabled>Chose Model</button>
+                    <select class="pill-select" id="model-input">
+                        <option value="">Choose a model</option>
+                        <option value="llama3.2">llama3.2</option>
+                        <option value="llama3.1">llama3.1</option>
+                        <option value="mistral">mistral</option>
+                        <option value="phi3">phi3</option>
+                        <option value="gemma">gemma</option>
+                    </select>
+                    <span class="pill-status" id="model-status"></span>
                 </div>
                 <div class="icon-group">
                     <button class="icon-button" type="button" disabled>📎</button>
@@ -127,14 +166,99 @@
     <script>
         const input = document.getElementById("composer-input");
         const sendButton = document.getElementById("send-button");
+        const modelInput = document.getElementById("model-input");
+        const modelStatus = document.getElementById("model-status");
+        let statusTimer = null;
 
         const updateSendState = () => {
             const hasText = input.value.trim().length > 0;
             sendButton.classList.toggle("active", hasText);
         };
 
+        const updateStatus = async () => {
+            try {
+                const response = await fetch("/model-status");
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || "Failed to read status.");
+                }
+
+                modelStatus.textContent = payload.message || "";
+                if (["ready", "error", "idle"].includes(payload.state)) {
+                    clearInterval(statusTimer);
+                    statusTimer = null;
+                    modelInput.disabled = false;
+                }
+            } catch (error) {
+                modelStatus.textContent = error.message || "Failed to read status.";
+                clearInterval(statusTimer);
+                statusTimer = null;
+                modelInput.disabled = false;
+            }
+        };
+
+        const setModel = async () => {
+            const model = modelInput.value.trim();
+            if (!model) {
+                modelStatus.textContent = "";
+                return;
+            }
+            modelInput.disabled = true;
+            modelStatus.textContent = "Starting...";
+
+            try {
+                const response = await fetch("/set-model", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ model }),
+                });
+
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.error || "Failed to set model.");
+                }
+                if (!statusTimer) {
+                    statusTimer = setInterval(updateStatus, 1000);
+                }
+            } catch (error) {
+                modelStatus.textContent = error.message || "Failed to set model.";
+            }
+        };
+
+        const loadModels = async () => {
+            modelStatus.textContent = "Loading models...";
+            try {
+                const response = await fetch("/models");
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || "Failed to load models.");
+                }
+
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "Choose a model";
+                modelInput.innerHTML = "";
+                modelInput.appendChild(placeholder);
+
+                payload.models.forEach((model) => {
+                    const option = document.createElement("option");
+                    option.value = model;
+                    option.textContent = model;
+                    modelInput.appendChild(option);
+                });
+
+                modelStatus.textContent = "";
+            } catch (error) {
+                modelStatus.textContent = error.message || "Failed to load models.";
+            }
+        };
+
         input.addEventListener("input", updateSendState);
+        modelInput.addEventListener("change", setModel);
         updateSendState();
+        loadModels();
     </script>
 </body>
 </html>
